@@ -50,6 +50,9 @@ from object_detection import trainer
 from object_detection.builders import input_reader_builder
 from object_detection.builders import model_builder
 from object_detection.utils import config_util
+from object_detection import exporter
+from object_detection.protos import pipeline_pb2
+from google.protobuf import text_format
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -79,12 +82,30 @@ flags.DEFINE_string('input_config_path', '',
                     'Path to an input_reader_pb2.InputReader config file.')
 flags.DEFINE_string('model_config_path', '',
                     'Path to a model_pb2.DetectionModel config file.')
-
+flags.DEFINE_boolean('export_model', False, 'Export the final model checkpoint to a ProtoBuf')
+flags.DEFINE_string('saved_model_output_dir', './output_graph.pb', 'Path to export the saved model')
+flags.DEFINE_string('input_type', 'image_tensor', 'Type of input node. Can be '
+                    'one of [`image_tensor`, `encoded_image_string_tensor`, '
+                    '`tf_example`]')
+flags.DEFINE_string('input_shape', None,
+                    'If input_type is `image_tensor`, this can explicitly set '
+                    'the shape of this input tensor to a fixed size. The '
+                    'dimensions are to be provided as a comma-separated list '
+                    'of integers. A value of -1 can be used for unknown '
+                    'dimensions. If not specified, for an `image_tensor, the '
+                    'default shape will be partially specified as '
+                    '`[None, None, None, 3]`.')
 FLAGS = flags.FLAGS
+
 
 
 def main(_):
   assert FLAGS.train_dir, '`train_dir` is missing.'
+  if FLAGS.export_model:
+    assert FLAGS.pipeline_config_path, '`pipeline_config_path` is required if exporting model'
+    pipeline_config = pipeline_pb2.TrainEvalPipelineConfig()
+    with tf.gfile.GFile(FLAGS.pipeline_config_path, 'r') as f:
+      text_format.Merge(f.read(), pipeline_config)
   if FLAGS.task == 0: tf.gfile.MakeDirs(FLAGS.train_dir)
   if FLAGS.pipeline_config_path:
     configs = config_util.get_configs_from_pipeline_file(
@@ -158,6 +179,10 @@ def main(_):
                 FLAGS.num_clones, worker_replicas, FLAGS.clone_on_cpu, ps_tasks,
                 worker_job_name, is_chief, FLAGS.train_dir)
 
+  if FLAGS.export_model:
+    latest_ckpt = tf.train.latest_checkpoint(FLAGS.train_dir)
+    exporter.export_inference_graph(FLAGS.input_type, pipeline_config,
+                                    latest_ckpt, FLAGS.saved_model_output_dir, FLAGS.input_shape)
 
 if __name__ == '__main__':
   tf.app.run()

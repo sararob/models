@@ -45,6 +45,19 @@ where `${PATH_TO_YOUR_PIPELINE_CONFIG}` points to the pipeline config and
 and events will be written to. By default, the training job will
 run indefinitely until the user kills it.
 
+To automatically export your trained model to a TensorFlow graph proto after training completes, run your local training job with the following additional parameters:
+
+```bash
+python object_detection/train.py \
+    --logtostderr \
+    --pipeline_config_path=./test/mobilenet_pets.config \
+    --train_dir=${PATH_TO_TRAIN_DIR} \
+    --export_model=True \
+    --saved_model_output_dir=${PATH_TO_OUTPUT_PROTO}
+```
+
+where `${PATH_TO_OUTPUT_PROTO}` is the directory where you'd like to save the exported proto.
+
 ## Running the Evaluation Job
 
 Evaluation is run as a separate job. The eval job will periodically poll the
